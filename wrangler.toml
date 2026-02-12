@@ -1,0 +1,13 @@
+# wrangler.toml
+name = "doc-search-worker"
+main = "src/index.ts"
+compatibility_date = "2024-02-12"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "doc_db"
+database_id = "b34b5737-2f6f-4df6-aa67-09899c502b49"  # <--- 修改这里
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "doc_bucket"
