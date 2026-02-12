@@ -9,7 +9,7 @@ type Bindings = {
   BUCKET: R2Bucket;
   TEAM_PASSWORD: string;
   ADMIN_PASSWORD: string;
-  TG_BOT_TOKEN: string; // 新增：Telegram 机器人 Token
+  TG_BOT_TOKEN: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -56,7 +56,7 @@ app.get('/api/search', async (c) => {
   return c.json(results);
 });
 
-// 下载/预览接口 (支持 Cookie 鉴权 和 URL Token 鉴权)
+// 下载/预览接口 (集成 Cache API 加速 🔥)
 app.get('/api/file/:id', async (c) => {
   const urlToken = c.req.query('token');
   let isAuth = false;
@@ -72,21 +72,55 @@ app.get('/api/file/:id', async (c) => {
 
   if (!isAuth) return c.text('Unauthorized', 401);
 
+  // --- 🔥 Cache API 逻辑开始 🔥 ---
+  // 使用 Cloudflare 默认缓存
+  const cache = caches.default;
+  // 使用当前请求的完整 URL 作为缓存键
+  const cacheKey = c.req.url;
+
+  // 1. 先尝试从缓存获取
+  const cachedResponse = await cache.match(cacheKey);
+  if (cachedResponse) {
+    console.log(`Cache Hit for ${cacheKey}`); // 调试日志：命中缓存
+    // 构造新响应以保留原有 Header (有时候 Response body 是一次性的，clone 是个好习惯)
+    return new Response(cachedResponse.body, cachedResponse);
+  }
+  // --- Cache API 逻辑结束 (部分1) ---
+
   const id = c.req.param('id');
   
-  // 1. 查数据库获取 R2 Key
+  // 2. 查数据库获取 R2 Key
   const file = await c.env.DB.prepare('SELECT r2_key, filename, size FROM files WHERE id = ?').bind(id).first();
   if (!file) return c.notFound();
 
-  // 2. 从 R2 获取文件流
+  // 3. 从 R2 获取文件流
   const object = await c.env.BUCKET.get(file.r2_key as string);
   if (!object) return c.notFound();
 
-  // 3. 设置响应头 (支持所有文件类型)
-  c.header('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
-  c.header('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename as string)}"`);
+  // 4. 构造响应头
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set('etag', object.httpEtag);
+  // 使用文件自带的真实 Content-Type，没有则默认为流
+  headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+  headers.set('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename as string)}"`);
+  
+  // 🔥 设置缓存规则：
+  // public: 允许 Cloudflare CDN 缓存
+  // max-age=14400: 缓存 4 小时 (4 * 60 * 60 秒)
+  headers.set('Cache-Control', 'public, max-age=14400');
 
-  return c.body(object.body);
+  const response = new Response(object.body, {
+    headers,
+  });
+
+  // --- 🔥 Cache API 逻辑开始 (部分2) 🔥 ---
+  // 5. 将响应写入缓存 (异步执行，不阻塞用户下载)
+  // 注意：必须使用 c.executionCtx.waitUntil，否则 Worker 结束时缓存可能还没写完
+  c.executionCtx.waitUntil(cache.put(cacheKey, response.clone()));
+  // --- Cache API 逻辑结束 ---
+
+  return response;
 });
 
 // 上传接口 (仅限管理员，支持所有文件类型)
@@ -100,7 +134,9 @@ app.post('/api/upload', async (c) => {
   if (!(file instanceof File)) return c.json({ error: 'Invalid file' }, 400);
 
   const fileId = crypto.randomUUID();
-  const r2Key = `${fileId}`; // 建议：去掉后缀，完全靠 Content-Type 识别
+  // 去掉 .pdf 后缀强制绑定，使用原始文件扩展名或无后缀，完全靠 Content-Type 识别
+  // 这里直接用 UUID 作为 R2 Key，避免文件名冲突
+  const r2Key = fileId; 
 
   // A. 写入 R2 (记录真实 Content-Type)
   await c.env.BUCKET.put(r2Key, file.stream(), {
@@ -181,7 +217,7 @@ app.post('/api/telegram', async (c) => {
       
       // @ts-ignore
       for (const file of results) {
-        // 生成免登录链接
+        // 生成免登录链接 (带 Token)
         const downloadLink = `${host}/api/file/${file.id}?token=${c.env.TEAM_PASSWORD}`;
         const sizeMB = (file.size / 1024 / 1024).toFixed(2);
         
