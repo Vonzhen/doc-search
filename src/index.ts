@@ -57,7 +57,7 @@ app.get('/api/file/:id', async (c) => {
   const object = await c.env.BUCKET.get(file.r2_key as string);
   if (!object) return c.notFound();
 
-  c.header('Content-Type', 'application/pdf');
+  c.header('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
   c.header('Content-Disposition', `inline; filename="${encodeURIComponent(file.filename as string)}"`);
 
   return c.body(object.body);
@@ -77,7 +77,7 @@ app.post('/api/upload', async (c) => {
   const r2Key = `${fileId}.pdf`;
 
   await c.env.BUCKET.put(r2Key, file.stream(), {
-    httpMetadata: { contentType: 'application/pdf' }
+    httpMetadata: { contentType: file.type }
   });
 
   const tags = tagsStr.split(/\s+/).filter(t => t.length > 0);
