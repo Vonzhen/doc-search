@@ -10,4 +10,4 @@ database_id = "b34b5737-2f6f-4df6-aa67-09899c502b49"  # <--- 修改这里
 
 [[r2_buckets]]
 binding = "BUCKET"
-bucket_name = "doc_bucket"
+bucket_name = "doc-bucket"
