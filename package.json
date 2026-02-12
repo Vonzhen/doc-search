@@ -1,5 +1,6 @@
 {
   "name": "doc-search",
+  "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy"
