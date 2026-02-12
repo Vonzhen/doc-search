@@ -6,7 +6,7 @@ export const html = (authLevel: AuthLevel) => `
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>内部文档索引</title>
+    <title>图纸文档索引</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.5/cdn.min.js" defer></script>
 </head>
@@ -14,7 +14,7 @@ export const html = (authLevel: AuthLevel) => `
 
     <div class="max-w-4xl mx-auto">
         <div class="flex justify-between items-center mb-8">
-            <h1 class="text-2xl font-bold text-gray-800">📄 内部文档索引</h1>
+            <h1 class="text-2xl font-bold text-gray-800">📄 图纸文档索引</h1>
             <div class="text-sm text-gray-500">
                 当前权限: <span class="font-mono font-bold" x-text="authLabel"></span>
                 <button x-show="authLevel > 0" @click="logout" class="ml-4 text-red-500 hover:underline">退出</button>
