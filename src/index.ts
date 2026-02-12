@@ -121,3 +121,5 @@ app.delete('/api/file/:id', async (c) => {
   
   return c.json({ success: true });
 });
+
+export default app;
