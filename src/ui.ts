@@ -35,7 +35,7 @@ export const html = (authLevel: AuthLevel) => `
                 <h3 class="font-bold mb-4">📤 上传新文档</h3>
                 <div class="flex gap-4 items-end">
                     <div class="flex-1">
-                        <label class="block text-sm text-gray-600 mb-1">选择 PDF</label>
+                        <label class="block text-sm text-gray-600 mb-1">选择文档</label>
                         <input type="file" x-ref="fileInput" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                     </div>
                     <div class="flex-1">
