@@ -1,4 +1,4 @@
-import { AuthLevel } from "./auth";
+import { AuthLevel, AUTH_COOKIE_NAME } from "./auth"; // <--- 关键修复：添加了 AUTH_COOKIE_NAME
 
 export const html = (authLevel: AuthLevel) => `
 <!DOCTYPE html>
