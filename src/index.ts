@@ -99,19 +99,25 @@ app.post('/api/upload', async (c) => {
   return c.json({ success: true });
 });
 
-// 7. 删除
+// 7. 删除 (修改版：增加手动删除标签逻辑)
 app.delete('/api/file/:id', async (c) => {
   if (checkAuth(c) < AuthLevel.ADMIN) return c.json({ error: 'Admin only' }, 403);
   
   const id = c.req.param('id');
+  
+  // 先查出文件信息，为了拿 r2_key
   const file = await c.env.DB.prepare('SELECT r2_key FROM files WHERE id = ?').bind(id).first();
   
   if (file) {
+    // 1. 删除 R2 里的实际文件
     await c.env.BUCKET.delete(file.r2_key as string);
+
+    // 2. 显式删除关联的标签 (新增这行，防止产生僵尸数据)
+    await c.env.DB.prepare('DELETE FROM file_tags WHERE file_id = ?').bind(id).run();
+
+    // 3. 删除文件主表记录
     await c.env.DB.prepare('DELETE FROM files WHERE id = ?').bind(id).run();
   }
   
   return c.json({ success: true });
 });
-
-export default app;
