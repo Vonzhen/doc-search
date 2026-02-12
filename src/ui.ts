@@ -1,4 +1,4 @@
-import { AuthLevel, AUTH_COOKIE_NAME } from "./auth"; // <--- 关键修复：添加了 AUTH_COOKIE_NAME
+import { AuthLevel } from "./auth"; // 注意：这里不再需要引入 AUTH_COOKIE_NAME 了
 
 export const html = (authLevel: AuthLevel) => `
 <!DOCTYPE html>
@@ -96,7 +96,7 @@ export const html = (authLevel: AuthLevel) => `
     <script>
         function app() {
             return {
-                authLevel: ${authLevel}, // 注入服务端状态
+                authLevel: ${authLevel},
                 password: '',
                 loginError: false,
                 searchQuery: '',
@@ -128,8 +128,9 @@ export const html = (authLevel: AuthLevel) => `
                     }
                 },
 
-                logout() {
-                    document.cookie = '${AUTH_COOKIE_NAME}=; Max-Age=0; path=/;';
+                // 核心修改：改为调用服务端 API 退出
+                async logout() {
+                    await fetch('/api/logout', { method: 'POST' });
                     window.location.reload();
                 },
 
@@ -158,7 +159,7 @@ export const html = (authLevel: AuthLevel) => `
                         alert('上传成功');
                         fileInput.value = '';
                         this.uploadTags = '';
-                        this.search(); // 刷新列表
+                        this.search();
                     } else {
                         alert('上传失败');
                     }
