@@ -112,7 +112,7 @@ export const html = (authLevel: AuthLevel) => `
     <script>
         function app() {
             return {
-                authLevel: \${authLevel},
+                authLevel: ${authLevel},
                 password: '',
                 loginError: false,
                 searchQuery: '',
