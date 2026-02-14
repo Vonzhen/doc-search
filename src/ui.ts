@@ -1,4 +1,4 @@
-import { AuthLevel } from "./auth"; // 注意：这里不再需要引入 AUTH_COOKIE_NAME 了
+import { AuthLevel } from "./auth"; 
 
 export const html = (authLevel: AuthLevel) => `
 <!DOCTYPE html>
@@ -61,7 +61,7 @@ export const html = (authLevel: AuthLevel) => `
                                 <th class="p-3">标签</th>
                                 <th class="p-3">大小</th>
                                 <th class="p-3">日期</th>
-                                <th class="p-3 text-right">操作</th>
+                                <th class="p-3 text-right w-40">操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -79,6 +79,7 @@ export const html = (authLevel: AuthLevel) => `
                                     <td class="p-3 text-sm text-gray-500" x-text="new Date(file.created_at).toLocaleDateString()"></td>
                                     <td class="p-3 text-right space-x-2">
                                         <a :href="'/api/file/' + file.id" target="_blank" class="text-blue-600 hover:underline">预览</a>
+                                        <button x-show="authLevel === 2" @click="openEditModal(file)" class="text-indigo-500 hover:text-indigo-700 text-sm">标签</button>
                                         <button x-show="authLevel === 2" @click="deleteFile(file.id)" class="text-red-500 hover:text-red-700 text-sm">删除</button>
                                     </td>
                                 </tr>
@@ -91,18 +92,40 @@ export const html = (authLevel: AuthLevel) => `
                 </div>
             </div>
         </div>
+
+        <div x-show="editModalOpen" style="display: none;" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-96 max-w-[90%]">
+                <h3 class="text-lg font-bold mb-4 text-gray-800">编辑文件标签</h3>
+                <p class="text-sm text-gray-500 mb-2 truncate" x-text="editingFileName"></p>
+                <input type="text" x-model="editTagsInput" @keyup.enter="saveTags" placeholder="多个标签用空格分隔" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none mb-6">
+                <div class="flex justify-end gap-3">
+                    <button @click="closeEditModal" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded">取消</button>
+                    <button @click="saveTags" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700" :disabled="isSavingTags">
+                        <span x-text="isSavingTags ? '保存中...' : '保存'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         function app() {
             return {
-                authLevel: ${authLevel},
+                authLevel: \${authLevel},
                 password: '',
                 loginError: false,
                 searchQuery: '',
                 files: [],
                 uploadTags: '',
                 isUploading: false,
+
+                // 编辑标签相关状态
+                editModalOpen: false,
+                editingFileId: null,
+                editingFileName: '',
+                editTagsInput: '',
+                isSavingTags: false,
 
                 get authLabel() {
                     if (this.authLevel === 2) return '管理员 (Admin)';
@@ -128,7 +151,6 @@ export const html = (authLevel: AuthLevel) => `
                     }
                 },
 
-                // 核心修改：改为调用服务端 API 退出
                 async logout() {
                     await fetch('/api/logout', { method: 'POST' });
                     window.location.reload();
@@ -170,6 +192,57 @@ export const html = (authLevel: AuthLevel) => `
                     if(!confirm('确定要删除吗？')) return;
                     const res = await fetch('/api/file/' + id, { method: 'DELETE' });
                     if (res.ok) this.search();
+                },
+
+                // 打开编辑弹窗
+                openEditModal(file) {
+                    this.editingFileId = file.id;
+                    this.editingFileName = file.filename;
+                    // 将数组转化为以空格分隔的字符串
+                    this.editTagsInput = (file.tags || []).join(' ');
+                    this.editModalOpen = true;
+                },
+
+                // 关闭编辑弹窗
+                closeEditModal() {
+                    this.editModalOpen = false;
+                    this.editingFileId = null;
+                    this.editingFileName = '';
+                    this.editTagsInput = '';
+                },
+
+                // 保存标签逻辑
+                async saveTags() {
+                    if (!this.editingFileId) return;
+                    
+                    this.isSavingTags = true;
+                    // 将空格分隔的字符串重新分割为数组
+                    const tagsArray = this.editTagsInput.split(/\\s+/).filter(t => t.length > 0);
+
+                    try {
+                        const res = await fetch('/api/file/' + this.editingFileId + '/tags', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ tags: tagsArray })
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            // 局部刷新：直接在内存中更新数据列表
+                            const index = this.files.findIndex(f => f.id === this.editingFileId);
+                            if (index !== -1) {
+                                this.files[index].tags = data.tags;
+                            }
+                            this.closeEditModal();
+                        } else {
+                            const err = await res.json();
+                            alert('标签更新失败: ' + (err.error || '未知错误'));
+                        }
+                    } catch (e) {
+                        alert('网络错误，无法更新标签');
+                    } finally {
+                        this.isSavingTags = false;
+                    }
                 }
             }
         }
